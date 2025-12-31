@@ -80,6 +80,7 @@ temp/
 
 # OpenAPI generated code
 .oapi-codegen.yaml
+openapi-gen/
 scripts/fetch_openapi_specs.sh
 scripts/generate_client.sh
 scripts/generate_types.sh
