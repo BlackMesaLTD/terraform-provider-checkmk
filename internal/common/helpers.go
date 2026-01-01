@@ -209,6 +209,119 @@ func GetInt64ValueOr(val types.Int64, defaultVal int64) int64 {
 }
 
 // =============================================================================
+// Type Coercion Helpers (API → Terraform)
+// =============================================================================
+// These helpers convert API response values to Terraform types using the
+// generated field type metadata for proper type handling.
+
+// TypeCoercer provides type coercion using version-specific field metadata.
+type TypeCoercer struct {
+	types *client.VersionedTypes
+}
+
+// NewTypeCoercer creates a new TypeCoercer with the given versioned types.
+// Returns nil if types is nil.
+func NewTypeCoercer(vt *client.VersionedTypes) *TypeCoercer {
+	if vt == nil {
+		return nil
+	}
+	return &TypeCoercer{types: vt}
+}
+
+// CoerceToString converts an API value to a Terraform string value.
+// Handles nil, string, int, float, and bool inputs.
+func (c *TypeCoercer) CoerceToString(value interface{}) types.String {
+	if value == nil {
+		return types.StringNull()
+	}
+	switch v := value.(type) {
+	case string:
+		return types.StringValue(v)
+	case int:
+		return types.StringValue(fmt.Sprintf("%d", v))
+	case int64:
+		return types.StringValue(fmt.Sprintf("%d", v))
+	case float64:
+		// Check if it's actually an integer
+		if v == float64(int64(v)) {
+			return types.StringValue(fmt.Sprintf("%d", int64(v)))
+		}
+		return types.StringValue(fmt.Sprintf("%g", v))
+	case bool:
+		if v {
+			return types.StringValue("true")
+		}
+		return types.StringValue("false")
+	default:
+		return types.StringValue(fmt.Sprintf("%v", value))
+	}
+}
+
+// CoerceToBool converts an API value to a Terraform bool value.
+func (c *TypeCoercer) CoerceToBool(value interface{}) types.Bool {
+	if value == nil {
+		return types.BoolNull()
+	}
+	switch v := value.(type) {
+	case bool:
+		return types.BoolValue(v)
+	case string:
+		return types.BoolValue(v == "true" || v == "1" || v == "yes")
+	case int, int64:
+		return types.BoolValue(v != 0)
+	case float64:
+		return types.BoolValue(v != 0)
+	default:
+		return types.BoolNull()
+	}
+}
+
+// CoerceToInt64 converts an API value to a Terraform int64 value.
+func (c *TypeCoercer) CoerceToInt64(value interface{}) types.Int64 {
+	if value == nil {
+		return types.Int64Null()
+	}
+	switch v := value.(type) {
+	case int:
+		return types.Int64Value(int64(v))
+	case int64:
+		return types.Int64Value(v)
+	case float64:
+		return types.Int64Value(int64(v))
+	case string:
+		var i int64
+		if _, err := fmt.Sscanf(v, "%d", &i); err == nil {
+			return types.Int64Value(i)
+		}
+		return types.Int64Null()
+	default:
+		return types.Int64Null()
+	}
+}
+
+// CoerceValue converts an API value to the appropriate Terraform type based on
+// the OpenAPI field type from the generated metadata.
+func (c *TypeCoercer) CoerceValue(schemaName, fieldName string, value interface{}) interface{} {
+	if c == nil || c.types == nil {
+		// No type info available, return as-is
+		return value
+	}
+
+	fieldType := c.types.GetFieldType(schemaName, fieldName)
+	switch fieldType {
+	case "string":
+		return c.CoerceToString(value)
+	case "boolean":
+		return c.CoerceToBool(value)
+	case "integer":
+		return c.CoerceToInt64(value)
+	default:
+		// For arrays, objects, or unknown types, return as-is
+		return value
+	}
+}
+
+// =============================================================================
 // Error Helpers
 // =============================================================================
 // Standardized error message formatting for consistency across resources.

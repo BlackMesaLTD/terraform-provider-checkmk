@@ -16,8 +16,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &HostResource{}
-var _ resource.ResourceWithImportState = &HostResource{}
+var (
+	_ resource.Resource                = &HostResource{}
+	_ resource.ResourceWithImportState = &HostResource{}
+	_ resource.ResourceWithValidateConfig = &HostResource{}
+)
 
 func NewHostResource() resource.Resource {
 	return &HostResource{}
@@ -275,4 +278,23 @@ func (r *HostResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 func (r *HostResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Import by host_name
 	resource.ImportStatePassthroughID(ctx, path.Root("host_name"), req, resp)
+}
+
+// ValidateConfig validates the resource configuration before apply.
+// This uses the generated types to check attribute names and enum values.
+func (r *HostResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Provider data may not be available during early validation
+	if r.providerData == nil {
+		return
+	}
+
+	var data HostResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Validate host attributes using generated types
+	validator := common.NewAttributeValidator(r.providerData)
+	resp.Diagnostics.Append(validator.ValidateHostAttributes(ctx, data.Attributes, path.Root("attributes"))...)
 }

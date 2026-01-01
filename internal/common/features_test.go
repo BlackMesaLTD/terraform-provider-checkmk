@@ -1,6 +1,7 @@
 package common
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/terraform-provider-checkmk/internal/client"
@@ -162,7 +163,7 @@ func TestFeatures_String(t *testing.T) {
 	}
 
 	for _, part := range expectedParts {
-		if !contains(str, part) {
+		if !strings.Contains(str, part) {
 			t.Errorf("Features.String() missing %q, got: %s", part, str)
 		}
 	}
@@ -188,21 +189,9 @@ func TestFeatures_String(t *testing.T) {
 	}
 
 	for _, part := range expectedParts {
-		if !contains(str, part) {
+		if !strings.Contains(str, part) {
 			t.Errorf("Features.String() missing %q, got: %s", part, str)
 		}
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

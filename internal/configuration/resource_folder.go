@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	_ resource.Resource                = &FolderResource{}
-	_ resource.ResourceWithImportState = &FolderResource{}
+	_ resource.Resource                   = &FolderResource{}
+	_ resource.ResourceWithImportState    = &FolderResource{}
+	_ resource.ResourceWithValidateConfig = &FolderResource{}
 )
 
 func NewFolderResource() resource.Resource {
@@ -324,4 +325,23 @@ func splitFolderPath(folderPath string) (parent, name string) {
 	name = parts[len(parts)-1]
 	parent = "/" + strings.Join(parts[:len(parts)-1], "/")
 	return parent, name
+}
+
+// ValidateConfig validates the resource configuration before apply.
+// This uses the generated types to check attribute names and enum values.
+func (r *FolderResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Provider data may not be available during early validation
+	if r.providerData == nil {
+		return
+	}
+
+	var data FolderResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Validate folder attributes using generated types
+	validator := common.NewAttributeValidator(r.providerData)
+	resp.Diagnostics.Append(validator.ValidateFolderAttributes(ctx, data.Attributes, path.Root("attributes"))...)
 }
