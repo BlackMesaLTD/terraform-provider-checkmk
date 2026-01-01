@@ -20,6 +20,12 @@ provider "checkmk" {
   # Concurrency control
   strict_resource_locking = false # Use If-Match: * (Python approach)
 
+  # Type validation mode (default: "auto")
+  # "auto"   - Use static types for known versions, fall back to hollow with warning
+  # "static" - Use static types for known versions, fail with error for unknown
+  # "hollow" - Skip type validation, rely on API
+  type_mode = "auto"
+
   # HTTP client settings
   request_timeout = 60 # Timeout in seconds
   max_retries     = 3  # Retries on 429/5xx errors

@@ -55,6 +55,7 @@ type checkmkProviderModel struct {
 	RequestTimeout        types.Int64  `tfsdk:"request_timeout"`
 	MaxRetries            types.Int64  `tfsdk:"max_retries"`
 	InsecureSkipVerify    types.Bool   `tfsdk:"insecure_skip_verify"`
+	TypeMode              types.String `tfsdk:"type_mode"`
 }
 
 // ProviderData is an alias to common.ProviderData for backwards compatibility
@@ -132,6 +133,13 @@ func (p *checkmkProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Description: "Skip TLS certificate verification (default: false). " +
 					"WARNING: Only use this for testing with self-signed certificates. " +
 					"This makes the connection insecure and should not be used in production.",
+				Optional: true,
+			},
+			"type_mode": schema.StringAttribute{
+				Description: "Type validation mode (default: 'auto'). " +
+					"'auto': Use static types for known versions (2.2, 2.3, 2.4), fall back to hollow with warning for unknown. " +
+					"'static': Use static types for known versions, fail with error for unknown versions. " +
+					"'hollow': Accept any attributes and rely on the API for validation.",
 				Optional: true,
 			},
 		},
@@ -263,6 +271,53 @@ func (p *checkmkProvider) Configure(ctx context.Context, req provider.ConfigureR
 		strictResourceLocking = config.StrictResourceLocking.ValueBool()
 	}
 
+	// Get type_mode setting (default: "auto")
+	typeMode := common.TypeModeAuto
+	if !config.TypeMode.IsNull() {
+		typeModeStr := config.TypeMode.ValueString()
+		switch typeModeStr {
+		case "auto":
+			typeMode = common.TypeModeAuto
+		case "static":
+			typeMode = common.TypeModeStatic
+		case "hollow":
+			typeMode = common.TypeModeHollow
+		default:
+			resp.Diagnostics.AddError(
+				"Invalid Type Mode",
+				fmt.Sprintf("The 'type_mode' parameter must be 'auto', 'static', or 'hollow', got: %s", typeModeStr),
+			)
+			return
+		}
+	}
+
+	// Initialize VersionedTypes for auto or static mode
+	var versionedTypes *client.VersionedTypes
+	if typeMode != common.TypeModeHollow {
+		versionedTypes = client.NewVersionedTypes(c.Version.String())
+		if !versionedTypes.SupportsVersion() {
+			if typeMode == common.TypeModeStatic {
+				resp.Diagnostics.AddError(
+					"Unsupported CheckMK Version",
+					fmt.Sprintf("CheckMK version %s is not in the list of supported versions. "+
+						"Supported versions: 2.2.0p1 through 2.4.0p18. "+
+						"To use this version, set type_mode = \"hollow\" in provider configuration.",
+						c.Version.String()),
+				)
+				return
+			}
+			// Auto mode: fall back to hollow with warning
+			resp.Diagnostics.AddWarning(
+				"Unsupported CheckMK Version for Type Validation",
+				fmt.Sprintf("CheckMK version %s is not in the list of supported versions. "+
+					"Falling back to hollow mode. To silence this warning, set type_mode = \"hollow\" in provider configuration.",
+					c.Version.String()),
+			)
+			typeMode = common.TypeModeHollow
+			versionedTypes = nil
+		}
+	}
+
 	// Initialize feature flags based on detected version
 	features := common.NewFeatures(c.Version)
 
@@ -275,6 +330,8 @@ func (p *checkmkProvider) Configure(ctx context.Context, req provider.ConfigureR
 		ForceForeignChanges:   forceForeignChanges,
 		ActivationWaitTime:    activationWaitTime,
 		StrictResourceLocking: strictResourceLocking,
+		TypeMode:              typeMode,
+		Types:                 versionedTypes,
 	}
 
 	resp.DataSourceData = providerData
