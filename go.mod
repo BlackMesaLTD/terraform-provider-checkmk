@@ -6,7 +6,7 @@ go 1.24.1
 replace github.com/BlackMesaLTD/checkmk-api-spec => ../checkmk-api-spec
 
 require (
-	github.com/BlackMesaLTD/checkmk-api-spec v0.0.3
+	github.com/BlackMesaLTD/checkmk-api-spec v0.0.4
 	github.com/hashicorp/terraform-plugin-docs v0.24.0
 	github.com/hashicorp/terraform-plugin-framework v1.17.0
 	github.com/hashicorp/terraform-plugin-go v0.29.0
@@ -14,7 +14,6 @@ require (
 	github.com/hashicorp/terraform-plugin-testing v1.14.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.1
 	golang.org/x/text v0.31.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -101,4 +100,5 @@ require (
 	google.golang.org/grpc v1.75.1 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

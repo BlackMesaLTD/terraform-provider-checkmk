@@ -2,6 +2,30 @@
 
 A Terraform provider for managing [CheckMK](https://checkmk.com/) monitoring infrastructure as code using the CheckMK REST API.
 
+## Features
+
+- **Full CRUD operations** for hosts, folders, users, rules, and more
+- **Version-aware API handling** - automatically adapts to CheckMK 2.2.x, 2.3.x, and 2.4.x differences
+- **OpenAPI-driven type safety** - field validation based on actual CheckMK API schemas
+- **Optimistic locking** - ETag-based concurrency control prevents conflicting updates
+- **Flexible activation** - auto-activate changes or batch them with explicit activation resources
+- **Import support** - bring existing CheckMK configuration under Terraform management
+- **Organized documentation** - resources grouped by category (Hosts & Folders, Rules, Users, etc.)
+
+## Related Projects
+
+This provider uses generated types from the companion repository:
+
+| Repository | Purpose |
+|------------|---------|
+| [checkmk-api-spec](https://github.com/BlackMesaLTD/checkmk-api-spec) | OpenAPI specs and generated Go types for CheckMK REST API |
+
+The `checkmk-api-spec` repository provides:
+- **42 baseline packages** covering all API variations across CheckMK versions
+- **Runtime version mapping** - any CheckMK version maps to correct types
+- **Field validators** - enum values, required fields, type information
+- **Union descriptions** - merged field documentation with version annotations
+
 ## Requirements
 
 - **Terraform**: >= 1.0
@@ -187,6 +211,29 @@ resource "checkmk_activation" "deploy" {
 
 The provider automatically detects the CheckMK version and adjusts API calls accordingly.
 
+## Current Limitations
+
+### API Coverage
+- **Partial resource coverage** - Not all CheckMK REST API endpoints are implemented yet. Priority has been given to hosts, folders, users, and rules.
+- **No data sources** - Currently only resources are implemented; data sources for reading existing configuration are planned.
+
+### Validation
+- **Runtime validation only** - Field validation against OpenAPI schemas happens at runtime, not during `terraform plan`. Invalid values will fail on `terraform apply`.
+- **Custom attributes** - User-defined custom attributes and tag values are accepted without validation (the API validates these).
+
+### Rules
+- **Complex rule values** - Some rule value types with deeply nested structures may require JSON encoding in the `value` attribute.
+- **Rule ordering** - Rule order within a ruleset is managed but bulk reordering operations are not atomic.
+
+### Operations
+- **Single-site only** - Distributed monitoring with multiple sites is not yet supported.
+- **No bulk operations** - Each resource is created/updated individually; bulk host creation is not implemented.
+- **Activation scope** - Activation applies to all pending changes, not just Terraform-managed resources.
+
+### Version Differences
+- **Schema variations** - Some attributes are only available in certain CheckMK versions. The provider accepts all attributes but the API may reject version-incompatible values.
+- **Enum value changes** - Valid enum values (like `tag_agent` choices) vary between versions. The union descriptions document these differences.
+
 ## Development
 
 ### Building
@@ -227,6 +274,7 @@ EOF
 
 - [CheckMK REST API Documentation](https://docs.checkmk.com/latest/en/rest_api.html)
 - [Terraform Plugin Framework](https://developer.hashicorp.com/terraform/plugin/framework)
+- [checkmk-api-spec Repository](https://github.com/BlackMesaLTD/checkmk-api-spec) - Generated types and version mappings
 
 ## License
 
