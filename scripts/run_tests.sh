@@ -164,7 +164,8 @@ run_tests_for_version() {
     export TF_ACC=1
 
     # Run tests
-    local test_args="-timeout 30m"
+    # Note: -tags checkmk_all is required for checkmk-api-spec generated types
+    local test_args="-tags checkmk_all -timeout 30m"
     if [[ "$VERBOSE" == "true" ]]; then
         test_args="$test_args -v"
     fi

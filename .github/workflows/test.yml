@@ -34,7 +34,7 @@ jobs:
           terraform_wrapper: false
 
       - name: Generate docs
-        run: go generate ./...
+        run: GOFLAGS='-tags=checkmk_all' go generate -tags checkmk_all ./...
 
       - name: Check for changes
         run: |
@@ -65,7 +65,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          if ! go test -race -v ./... 2>&1 | tee test-output.txt; then
+          if ! go test -tags checkmk_all -race -v -skip 'TestAcc' ./... 2>&1 | tee test-output.txt; then
             echo "## ❌ Unit Tests Failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -90,6 +90,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          args: --build-tags checkmk_all
 
   build:
     name: Build
@@ -104,7 +105,7 @@ jobs:
           cache: true
 
       - name: Build
-        run: go build -v ./...
+        run: go build -tags checkmk_all -v ./...
 
   # Integration tests - run in parallel across CheckMK versions
   acceptance:
