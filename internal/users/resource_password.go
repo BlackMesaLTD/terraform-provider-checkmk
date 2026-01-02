@@ -14,8 +14,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &PasswordResource{}
-var _ resource.ResourceWithImportState = &PasswordResource{}
+var (
+	_ resource.Resource                   = &PasswordResource{}
+	_ resource.ResourceWithImportState    = &PasswordResource{}
+	_ resource.ResourceWithValidateConfig = &PasswordResource{}
+)
 
 func NewPasswordResource() resource.Resource {
 	return &PasswordResource{}
@@ -344,4 +347,24 @@ func updatePasswordState(data *PasswordResourceModel, password *client.Password)
 
 	// Note: ShareWith from API response may be in different order
 	// We preserve state to avoid unnecessary diffs unless we want to reconcile
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *PasswordResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if r.providerData == nil {
+		return
+	}
+
+	var data PasswordResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validator := common.NewAttributeValidator(r.providerData)
+
+	// Validate fields against PasswordObject schema
+	resp.Diagnostics.Append(validator.ValidateStringField("PasswordObject", "title", data.Title, path.Root("title"))...)
+	resp.Diagnostics.Append(validator.ValidateStringField("PasswordObject", "owner", data.Owner, path.Root("owner"))...)
+	resp.Diagnostics.Append(validator.ValidateStringField("PasswordObject", "editable_by", data.EditableBy, path.Root("editable_by"))...)
 }

@@ -19,7 +19,8 @@ import (
 )
 
 var (
-	_ resource.Resource = &ActivationResource{}
+	_ resource.Resource                   = &ActivationResource{}
+	_ resource.ResourceWithValidateConfig = &ActivationResource{}
 )
 
 func NewActivationResource() resource.Resource {
@@ -360,4 +361,10 @@ func (r *ActivationResource) buildActivationNotes(pendingChanges map[string]int,
 	}
 
 	return fmt.Sprintf("Activating %d change(s): %s", total, strings.Join(parts, ", "))
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *ActivationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Activation resource uses provider-specific attributes, not CheckMK API schemas.
+	// No OpenAPI schema validation needed - Terraform schema handles validation.
 }

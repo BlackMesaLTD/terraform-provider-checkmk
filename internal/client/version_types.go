@@ -33,41 +33,12 @@ func (v *VersionedTypes) SupportsVersion() bool {
 	return v != nil && v.Baseline != ""
 }
 
-// BaselineVersion returns the baseline version string (e.g., "v2_4_0p17").
+// BaselineVersion returns the baseline version string (e.g., "v2_4_0_p17").
 func (v *VersionedTypes) BaselineVersion() string {
 	if v == nil {
 		return ""
 	}
 	return string(v.Baseline)
-}
-
-// Host Attribute Validators
-
-// ValidHostTagAgentValues returns valid tag_agent values for the connected CheckMK version.
-// Returns nil if the version is not recognized.
-func (v *VersionedTypes) ValidHostTagAgentValues() []string {
-	if v == nil {
-		return nil
-	}
-	return types.ValidHostTagAgentValues(v.Baseline)
-}
-
-// Field Name Lists
-
-// HostCreateAttributeFieldNames returns valid host attribute field names for the version.
-func (v *VersionedTypes) HostCreateAttributeFieldNames() []string {
-	if v == nil {
-		return nil
-	}
-	return types.HostCreateAttributeFieldNames(v.Baseline)
-}
-
-// FolderCreateAttributeFieldNames returns valid folder attribute field names.
-func (v *VersionedTypes) FolderCreateAttributeFieldNames() []string {
-	if v == nil {
-		return nil
-	}
-	return types.FolderCreateAttributeFieldNames(v.Baseline)
 }
 
 // LookupBaseline is a convenience wrapper around types.LookupBaseline.
@@ -81,7 +52,64 @@ func IsVersionSupported(version string) bool {
 	return types.LookupBaseline(version) != ""
 }
 
-// Metadata Accessors
+// =============================================================================
+// Generic Schema Introspection API
+// =============================================================================
+
+// GetAllSchemaNames returns all schema names available in this baseline.
+// Returns 700-900 schemas depending on version.
+func (v *VersionedTypes) GetAllSchemaNames() []string {
+	if v == nil {
+		return nil
+	}
+	return types.GetAllSchemaNames(v.Baseline)
+}
+
+// GetSchemaFieldNames returns the field names for a given schema.
+// Works with any of the 700-900 schemas in the OpenAPI spec.
+func (v *VersionedTypes) GetSchemaFieldNames(schema string) []string {
+	if v == nil {
+		return nil
+	}
+	return types.GetSchemaFieldNames(v.Baseline, schema)
+}
+
+// GetSchemaRequiredFieldNames returns the required field names for a given schema.
+func (v *VersionedTypes) GetSchemaRequiredFieldNames(schema string) []string {
+	if v == nil {
+		return nil
+	}
+	return types.GetSchemaRequiredFieldNames(v.Baseline, schema)
+}
+
+// HasSchema returns true if the schema exists in this baseline.
+func (v *VersionedTypes) HasSchema(schema string) bool {
+	if v == nil {
+		return false
+	}
+	return types.HasSchema(v.Baseline, schema)
+}
+
+// GetValidEnumValues returns valid enum values for a field in a schema.
+// Returns nil if the field doesn't have enum constraints.
+func (v *VersionedTypes) GetValidEnumValues(schema, field string) []string {
+	if v == nil {
+		return nil
+	}
+	return types.GetValidEnumValues(v.Baseline, schema, field)
+}
+
+// HasEnumConstraint returns true if a field has enum constraints.
+func (v *VersionedTypes) HasEnumConstraint(schema, field string) bool {
+	if v == nil {
+		return false
+	}
+	return types.HasEnumConstraint(v.Baseline, schema, field)
+}
+
+// =============================================================================
+// Field Metadata API
+// =============================================================================
 
 // GetFieldDescription returns the description for a field in a schema.
 // Returns empty string if not available.
@@ -117,100 +145,48 @@ func (v *VersionedTypes) IsRequiredField(schemaName, fieldName string) bool {
 	return types.IsRequiredField(v.Baseline, schemaName, fieldName)
 }
 
-// Compare Key Fields
-
-// HostCreateAttributeCompareKeyFields returns fields used for comparison/hashing.
-func (v *VersionedTypes) HostCreateAttributeCompareKeyFields() []string {
-	if v == nil {
-		return nil
-	}
-	return types.HostCreateAttributeCompareKeyFields(v.Baseline)
-}
-
-// FolderCreateAttributeCompareKeyFields returns fields used for comparison/hashing.
-func (v *VersionedTypes) FolderCreateAttributeCompareKeyFields() []string {
-	if v == nil {
-		return nil
-	}
-	return types.FolderCreateAttributeCompareKeyFields(v.Baseline)
-}
-
-// Request Builders
-
-// BuildCreateHostFromMap creates a typed CreateHost request from a map.
-func (v *VersionedTypes) BuildCreateHostFromMap(data map[string]interface{}) (interface{}, error) {
-	if v == nil {
-		return nil, nil
-	}
-	return types.BuildCreateHostFromMap(v.Baseline, data)
-}
-
-// BuildCreateFolderFromMap creates a typed CreateFolder request from a map.
-func (v *VersionedTypes) BuildCreateFolderFromMap(data map[string]interface{}) (interface{}, error) {
-	if v == nil {
-		return nil, nil
-	}
-	return types.BuildCreateFolderFromMap(v.Baseline, data)
-}
-
-// Response Parsers
-
-// ParseHostConfigFromMap parses a map into a typed HostConfig response.
-func (v *VersionedTypes) ParseHostConfigFromMap(data map[string]interface{}) (interface{}, error) {
-	if v == nil {
-		return nil, nil
-	}
-	return types.ParseHostConfigFromMap(v.Baseline, data)
-}
-
-// ParseFolderFromMap parses a map into a typed Folder response.
-func (v *VersionedTypes) ParseFolderFromMap(data map[string]interface{}) (interface{}, error) {
-	if v == nil {
-		return nil, nil
-	}
-	return types.ParseFolderFromMap(v.Baseline, data)
-}
-
-// Import State Mapping
-
-// ExtractHostConfigField extracts a Terraform field value from a HostConfig API response.
-func (v *VersionedTypes) ExtractHostConfigField(response map[string]interface{}, tfField string) interface{} {
-	if v == nil {
-		return nil
-	}
-	return types.ExtractHostConfigField(v.Baseline, response, tfField)
-}
-
-// ExtractFolderField extracts a Terraform field value from a Folder API response.
-func (v *VersionedTypes) ExtractFolderField(response map[string]interface{}, tfField string) interface{} {
-	if v == nil {
-		return nil
-	}
-	return types.ExtractFolderField(v.Baseline, response, tfField)
-}
-
-// HostConfigFieldMappings returns the field mappings for HostConfig.
-func (v *VersionedTypes) HostConfigFieldMappings() map[string][]string {
-	if v == nil {
-		return nil
-	}
-	return types.HostConfigFieldMappings(v.Baseline)
-}
-
-// FolderFieldMappings returns the field mappings for Folder.
-func (v *VersionedTypes) FolderFieldMappings() map[string][]string {
-	if v == nil {
-		return nil
-	}
-	return types.FolderFieldMappings(v.Baseline)
-}
-
-// Deprecation Warnings
-
 // IsDeprecatedField checks if a field is deprecated for a given schema.
 func (v *VersionedTypes) IsDeprecatedField(schemaName, fieldName string) bool {
 	if v == nil {
 		return false
 	}
 	return types.IsDeprecatedField(v.Baseline, schemaName, fieldName)
+}
+
+// =============================================================================
+// Validation Helpers
+// =============================================================================
+
+// ValidateFieldName checks if a field name is valid for a given schema.
+func (v *VersionedTypes) ValidateFieldName(schema, field string) bool {
+	if v == nil {
+		return true // Allow if no type info
+	}
+	fields := v.GetSchemaFieldNames(schema)
+	if fields == nil {
+		return true // Allow if schema not found
+	}
+	for _, f := range fields {
+		if f == field {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidateEnumValue checks if a value is valid for an enum field.
+func (v *VersionedTypes) ValidateEnumValue(schema, field, value string) bool {
+	if v == nil {
+		return true // Allow if no type info
+	}
+	if !v.HasEnumConstraint(schema, field) {
+		return true // Allow if not an enum
+	}
+	validValues := v.GetValidEnumValues(schema, field)
+	for _, valid := range validValues {
+		if valid == value {
+			return true
+		}
+	}
+	return false
 }

@@ -6,6 +6,7 @@ A Terraform provider for managing [CheckMK](https://checkmk.com/) monitoring inf
 
 - **Full CRUD operations** for hosts, folders, users, rules, and more
 - **Version-aware API handling** - automatically adapts to CheckMK 2.2.x, 2.3.x, and 2.4.x differences
+- **Plan-time validation** - field names and enum values validated during `terraform plan` using version-specific types
 - **OpenAPI-driven type safety** - field validation based on actual CheckMK API schemas
 - **Optimistic locking** - ETag-based concurrency control prevents conflicting updates
 - **Flexible activation** - auto-activate changes or batch them with explicit activation resources
@@ -218,8 +219,9 @@ The provider automatically detects the CheckMK version and adjusts API calls acc
 - **No data sources** - Currently only resources are implemented; data sources for reading existing configuration are planned.
 
 ### Validation
-- **Runtime validation only** - Field validation against OpenAPI schemas happens at runtime, not during `terraform plan`. Invalid values will fail on `terraform apply`.
-- **Custom attributes** - User-defined custom attributes and tag values are accepted without validation (the API validates these).
+- **Plan-time validation** - Field names and enum values (like `tag_agent`) are validated during `terraform plan` when connected to CheckMK. Invalid values produce errors before apply.
+- **Custom attributes** - User-defined custom attributes and tag values (prefixed with `tag_` or `labels`) are accepted without validation (the API validates these).
+- **Hollow mode** - Set `type_mode = "hollow"` to skip plan-time validation entirely (useful for testing or when version types are unavailable).
 
 ### Rules
 - **Complex rule values** - Some rule value types with deeply nested structures may require JSON encoding in the `value` attribute.

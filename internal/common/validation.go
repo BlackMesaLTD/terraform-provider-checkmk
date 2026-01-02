@@ -34,9 +34,9 @@ func (v *AttributeValidator) ShouldValidate() bool {
 	return v.providerData.Types != nil
 }
 
-// ValidateHostAttributes validates host attributes against the generated types.
-// Returns diagnostics with any validation errors.
-func (v *AttributeValidator) ValidateHostAttributes(ctx context.Context, attributes types.Map, attrPath path.Path) diag.Diagnostics {
+// ValidateAttributes validates attributes against the generated types for a given schema.
+// schemaName is the OpenAPI schema name (e.g., "HostCreateAttribute", "FolderCreateAttribute").
+func (v *AttributeValidator) ValidateAttributes(ctx context.Context, schemaName string, attributes types.Map, attrPath path.Path) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	if !v.ShouldValidate() {
@@ -47,8 +47,8 @@ func (v *AttributeValidator) ValidateHostAttributes(ctx context.Context, attribu
 		return diags
 	}
 
-	// Get valid field names for this version
-	validFields := v.providerData.Types.HostCreateAttributeFieldNames()
+	// Get valid field names for this version and schema
+	validFields := v.providerData.Types.GetSchemaFieldNames(schemaName)
 	if len(validFields) == 0 {
 		// No field validation available, skip
 		return diags
@@ -65,16 +65,16 @@ func (v *AttributeValidator) ValidateHostAttributes(ctx context.Context, attribu
 
 			diags.AddAttributeError(
 				attrPath.AtMapKey(key),
-				"Invalid Host Attribute",
-				fmt.Sprintf("Attribute %q is not valid for CheckMK version %s. "+
+				"Invalid Attribute",
+				fmt.Sprintf("Attribute %q is not valid for %s in CheckMK version %s. "+
 					"Valid attributes include: %s. "+
 					"If this is a custom attribute, prefix it with 'tag_' or ensure it's defined in CheckMK.",
-					key, v.providerData.Client.Version.String(), formatValidFields(validFields)),
+					key, schemaName, v.providerData.Client.Version.String(), formatValidFields(validFields)),
 			)
 		}
 
 		// Warn about read-only fields
-		if v.providerData.Types.IsReadOnlyField("HostCreateAttribute", key) {
+		if v.providerData.Types.IsReadOnlyField(schemaName, key) {
 			diags.AddAttributeWarning(
 				attrPath.AtMapKey(key),
 				"Read-Only Attribute",
@@ -83,60 +83,38 @@ func (v *AttributeValidator) ValidateHostAttributes(ctx context.Context, attribu
 					key),
 			)
 		}
+
+		// Warn about deprecated fields
+		if v.providerData.Types.IsDeprecatedField(schemaName, key) {
+			diags.AddAttributeWarning(
+				attrPath.AtMapKey(key),
+				"Deprecated Attribute",
+				fmt.Sprintf("Attribute %q is deprecated and may be removed in a future CheckMK version.",
+					key),
+			)
+		}
 	}
 
-	// Validate tag_agent values if present
-	diags.Append(v.validateTagAgent(ctx, attributes, attrPath)...)
+	return diags
+}
+
+// ValidateHostAttributes validates host attributes against the generated types.
+// Returns diagnostics with any validation errors.
+func (v *AttributeValidator) ValidateHostAttributes(ctx context.Context, attributes types.Map, attrPath path.Path) diag.Diagnostics {
+	diags := v.ValidateAttributes(ctx, "HostCreateAttribute", attributes, attrPath)
+
+	// Validate tag_agent enum values if present
+	diags.Append(v.validateEnumField(ctx, "HostCreateAttribute", "tag_agent", attributes, attrPath)...)
 
 	return diags
 }
 
 // ValidateFolderAttributes validates folder attributes against the generated types.
 func (v *AttributeValidator) ValidateFolderAttributes(ctx context.Context, attributes types.Map, attrPath path.Path) diag.Diagnostics {
-	var diags diag.Diagnostics
+	diags := v.ValidateAttributes(ctx, "FolderCreateAttribute", attributes, attrPath)
 
-	if !v.ShouldValidate() {
-		return diags
-	}
-
-	if attributes.IsNull() || attributes.IsUnknown() {
-		return diags
-	}
-
-	validFields := v.providerData.Types.FolderCreateAttributeFieldNames()
-	if len(validFields) == 0 {
-		return diags
-	}
-
-	for key := range attributes.Elements() {
-		if !contains(validFields, key) {
-			if isCustomAttribute(key) {
-				continue
-			}
-
-			diags.AddAttributeError(
-				attrPath.AtMapKey(key),
-				"Invalid Folder Attribute",
-				fmt.Sprintf("Attribute %q is not valid for CheckMK version %s. "+
-					"Valid attributes include: %s.",
-					key, v.providerData.Client.Version.String(), formatValidFields(validFields)),
-			)
-		}
-
-		// Warn about read-only fields
-		if v.providerData.Types.IsReadOnlyField("FolderCreateAttribute", key) {
-			diags.AddAttributeWarning(
-				attrPath.AtMapKey(key),
-				"Read-Only Attribute",
-				fmt.Sprintf("Attribute %q is read-only and cannot be set. "+
-					"It will be computed by CheckMK and any value provided will be ignored.",
-					key),
-			)
-		}
-	}
-
-	// Validate tag_agent values if present
-	diags.Append(v.validateTagAgent(ctx, attributes, attrPath)...)
+	// Validate tag_agent enum values if present
+	diags.Append(v.validateEnumField(ctx, "FolderCreateAttribute", "tag_agent", attributes, attrPath)...)
 
 	return diags
 }
@@ -150,75 +128,61 @@ func (v *AttributeValidator) ValidateRequiredFields(schemaName string, providedF
 		return diags
 	}
 
-	// Check each field that might be required
-	// Since we don't have a list of required fields exposed directly, we check each provided field
-	// and also need to check for missing required fields.
-	// For now, we use the IsRequiredField method to check if any known required field is missing.
+	// Get required fields for this schema
+	requiredFields := v.providerData.Types.GetSchemaRequiredFieldNames(schemaName)
 
-	// Common required fields for different schemas
-	requiredFieldsToCheck := getRequiredFieldsForSchema(schemaName)
-
-	for _, field := range requiredFieldsToCheck {
-		if v.providerData.Types.IsRequiredField(schemaName, field) {
-			if _, exists := providedFields[field]; !exists {
-				diags.AddAttributeError(
-					attrPath,
-					"Missing Required Field",
-					fmt.Sprintf("Field %q is required for %s in CheckMK version %s.",
-						field, schemaName, v.providerData.Client.Version.String()),
-				)
-			}
+	for _, field := range requiredFields {
+		if _, exists := providedFields[field]; !exists {
+			diags.AddAttributeError(
+				attrPath,
+				"Missing Required Field",
+				fmt.Sprintf("Field %q is required for %s in CheckMK version %s.",
+					field, schemaName, v.providerData.Client.Version.String()),
+			)
 		}
 	}
 
 	return diags
 }
 
-// getRequiredFieldsForSchema returns a list of field names to check for required status.
-// This is a hint list - actual required status is determined by the generated types.
-func getRequiredFieldsForSchema(schemaName string) []string {
-	switch schemaName {
-	case "CreateHost":
-		return []string{"host_name", "folder"}
-	case "CreateClusterHost":
-		return []string{"host_name", "folder", "nodes"}
-	case "CreateFolder":
-		return []string{"name", "parent", "title"}
-	case "CreateUser":
-		return []string{"username", "fullname"}
-	default:
-		return nil
-	}
-}
-
-// validateTagAgent validates the tag_agent attribute value if present.
-func (v *AttributeValidator) validateTagAgent(ctx context.Context, attributes types.Map, attrPath path.Path) diag.Diagnostics {
+// validateEnumField validates an enum field value if present.
+func (v *AttributeValidator) validateEnumField(ctx context.Context, schemaName, fieldName string, attributes types.Map, attrPath path.Path) diag.Diagnostics {
 	var diags diag.Diagnostics
 
+	if !v.ShouldValidate() {
+		return diags
+	}
+
 	elements := attributes.Elements()
-	tagAgentAttr, exists := elements["tag_agent"]
+	fieldAttr, exists := elements[fieldName]
 	if !exists {
 		return diags
 	}
 
-	tagAgentStr, ok := tagAgentAttr.(types.String)
-	if !ok || tagAgentStr.IsNull() || tagAgentStr.IsUnknown() {
+	fieldStr, ok := fieldAttr.(types.String)
+	if !ok || fieldStr.IsNull() || fieldStr.IsUnknown() {
 		return diags
 	}
 
-	tagAgentValue := tagAgentStr.ValueString()
-	validValues := v.providerData.Types.ValidHostTagAgentValues()
+	fieldValue := fieldStr.ValueString()
+
+	// Check if this field has enum constraints
+	if !v.providerData.Types.HasEnumConstraint(schemaName, fieldName) {
+		return diags
+	}
+
+	validValues := v.providerData.Types.GetValidEnumValues(schemaName, fieldName)
 	if len(validValues) == 0 {
 		return diags
 	}
 
-	if !contains(validValues, tagAgentValue) {
+	if !contains(validValues, fieldValue) {
 		diags.AddAttributeError(
-			attrPath.AtMapKey("tag_agent"),
-			"Invalid tag_agent Value",
-			fmt.Sprintf("Value %q is not valid for tag_agent in CheckMK version %s. "+
+			attrPath.AtMapKey(fieldName),
+			fmt.Sprintf("Invalid %s Value", fieldName),
+			fmt.Sprintf("Value %q is not valid for %s in CheckMK version %s. "+
 				"Valid values are: %s.",
-				tagAgentValue, v.providerData.Client.Version.String(), strings.Join(validValues, ", ")),
+				fieldValue, fieldName, v.providerData.Client.Version.String(), strings.Join(validValues, ", ")),
 		)
 	}
 
@@ -274,28 +238,36 @@ func NewVersionedTypesWrapper(types *client.VersionedTypes) *VersionedTypesWrapp
 	return &VersionedTypesWrapper{types: types}
 }
 
-// ValidHostTagAgentValues returns valid tag_agent values, or nil if not available.
-func (w *VersionedTypesWrapper) ValidHostTagAgentValues() []string {
+// GetSchemaFieldNames returns field names for a schema, or nil if not available.
+func (w *VersionedTypesWrapper) GetSchemaFieldNames(schema string) []string {
 	if w.types == nil {
 		return nil
 	}
-	return w.types.ValidHostTagAgentValues()
+	return w.types.GetSchemaFieldNames(schema)
 }
 
-// HostCreateAttributeFieldNames returns valid host attribute field names, or nil if not available.
-func (w *VersionedTypesWrapper) HostCreateAttributeFieldNames() []string {
+// GetSchemaRequiredFieldNames returns required field names for a schema, or nil if not available.
+func (w *VersionedTypesWrapper) GetSchemaRequiredFieldNames(schema string) []string {
 	if w.types == nil {
 		return nil
 	}
-	return w.types.HostCreateAttributeFieldNames()
+	return w.types.GetSchemaRequiredFieldNames(schema)
 }
 
-// FolderCreateAttributeFieldNames returns valid folder attribute field names, or nil if not available.
-func (w *VersionedTypesWrapper) FolderCreateAttributeFieldNames() []string {
+// GetValidEnumValues returns valid enum values for a field, or nil if not available.
+func (w *VersionedTypesWrapper) GetValidEnumValues(schema, field string) []string {
 	if w.types == nil {
 		return nil
 	}
-	return w.types.FolderCreateAttributeFieldNames()
+	return w.types.GetValidEnumValues(schema, field)
+}
+
+// HasEnumConstraint returns true if a field has enum constraints.
+func (w *VersionedTypesWrapper) HasEnumConstraint(schema, field string) bool {
+	if w.types == nil {
+		return false
+	}
+	return w.types.HasEnumConstraint(schema, field)
 }
 
 // GetFieldDescription returns the description for a field, or empty string if not available.
@@ -328,4 +300,73 @@ func (w *VersionedTypesWrapper) IsRequiredField(schemaName, fieldName string) bo
 		return false
 	}
 	return w.types.IsRequiredField(schemaName, fieldName)
+}
+
+// IsDeprecatedField checks if a field is deprecated, returns false if not available.
+func (w *VersionedTypesWrapper) IsDeprecatedField(schemaName, fieldName string) bool {
+	if w.types == nil {
+		return false
+	}
+	return w.types.IsDeprecatedField(schemaName, fieldName)
+}
+
+// =============================================================================
+// Generic Field Validators for Static Schema Resources
+// =============================================================================
+
+// ValidateStringField validates a string field against enum constraints if they exist.
+// Returns diagnostics with validation errors or deprecation warnings.
+func (v *AttributeValidator) ValidateStringField(schemaName, fieldName string, value types.String, attrPath path.Path) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	if !v.ShouldValidate() {
+		return diags
+	}
+
+	if value.IsNull() || value.IsUnknown() {
+		return diags
+	}
+
+	fieldValue := value.ValueString()
+
+	// Check for deprecation
+	if v.providerData.Types.IsDeprecatedField(schemaName, fieldName) {
+		diags.AddAttributeWarning(
+			attrPath,
+			"Deprecated Field",
+			fmt.Sprintf("Field %q is deprecated and may be removed in a future CheckMK version.", fieldName),
+		)
+	}
+
+	// Check enum constraints
+	if v.providerData.Types.HasEnumConstraint(schemaName, fieldName) {
+		validValues := v.providerData.Types.GetValidEnumValues(schemaName, fieldName)
+		if len(validValues) > 0 && !contains(validValues, fieldValue) {
+			diags.AddAttributeError(
+				attrPath,
+				fmt.Sprintf("Invalid %s Value", fieldName),
+				fmt.Sprintf("Value %q is not valid for %s in CheckMK version %s. Valid values are: %s.",
+					fieldValue, fieldName, v.providerData.Client.Version.String(), strings.Join(validValues, ", ")),
+			)
+		}
+	}
+
+	return diags
+}
+
+// ValidateSchemaExists checks if a schema exists for the current CheckMK version.
+// Useful for warning about features not available in older versions.
+func (v *AttributeValidator) ValidateSchemaExists(schemaName string) bool {
+	if !v.ShouldValidate() {
+		return true // Allow if no type info
+	}
+	return v.providerData.Types.HasSchema(schemaName)
+}
+
+// GetVersionString returns the CheckMK version string for error messages.
+func (v *AttributeValidator) GetVersionString() string {
+	if v.providerData == nil || v.providerData.Client == nil {
+		return "unknown"
+	}
+	return v.providerData.Client.Version.String()
 }

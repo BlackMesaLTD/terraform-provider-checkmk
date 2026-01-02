@@ -101,8 +101,9 @@ type BaseRuleWrapper struct {
 
 // Ensure BaseRuleWrapper implements the required interfaces.
 var (
-	_ resource.Resource                = &BaseRuleWrapper{}
-	_ resource.ResourceWithImportState = &BaseRuleWrapper{}
+	_ resource.Resource                   = &BaseRuleWrapper{}
+	_ resource.ResourceWithImportState    = &BaseRuleWrapper{}
+	_ resource.ResourceWithValidateConfig = &BaseRuleWrapper{}
 )
 
 // Metadata returns the resource type name.
@@ -668,4 +669,11 @@ func trackAndActivate(ctx context.Context, providerData *ProviderData, resourceT
 		providerData.StrictResourceLocking,
 		providerData.ActivationWaitTime,
 	)
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *BaseRuleWrapper) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Rule wrappers use the generic RuleObject schema for validation.
+	// Most validation is handled by the ruleset-specific ValidateConditions callback.
+	// The Terraform schema provides structural validation.
 }

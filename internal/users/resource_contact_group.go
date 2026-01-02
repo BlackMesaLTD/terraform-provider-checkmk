@@ -13,8 +13,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &ContactGroupResource{}
-var _ resource.ResourceWithImportState = &ContactGroupResource{}
+var (
+	_ resource.Resource                   = &ContactGroupResource{}
+	_ resource.ResourceWithImportState    = &ContactGroupResource{}
+	_ resource.ResourceWithValidateConfig = &ContactGroupResource{}
+)
 
 func NewContactGroupResource() resource.Resource {
 	return &ContactGroupResource{}
@@ -187,4 +190,22 @@ func (r *ContactGroupResource) Delete(ctx context.Context, req resource.DeleteRe
 func (r *ContactGroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), req.ID)...)
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *ContactGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if r.providerData == nil {
+		return
+	}
+
+	var data ContactGroupResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validator := common.NewAttributeValidator(r.providerData)
+
+	// Validate fields against ContactGroup schema
+	resp.Diagnostics.Append(validator.ValidateStringField("ContactGroup", "alias", data.Alias, path.Root("alias"))...)
 }

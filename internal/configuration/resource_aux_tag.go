@@ -13,8 +13,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &AuxTagResource{}
-var _ resource.ResourceWithImportState = &AuxTagResource{}
+var (
+	_ resource.Resource                   = &AuxTagResource{}
+	_ resource.ResourceWithImportState    = &AuxTagResource{}
+	_ resource.ResourceWithValidateConfig = &AuxTagResource{}
+)
 
 func NewAuxTagResource() resource.Resource {
 	return &AuxTagResource{}
@@ -211,4 +214,24 @@ func (r *AuxTagResource) Delete(ctx context.Context, req resource.DeleteRequest,
 
 func (r *AuxTagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *AuxTagResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if r.providerData == nil {
+		return
+	}
+
+	var data AuxTagResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validator := common.NewAttributeValidator(r.providerData)
+
+	// Validate fields against AuxTagAttrsCreate schema
+	resp.Diagnostics.Append(validator.ValidateStringField("AuxTagAttrsCreate", "title", data.Title, path.Root("title"))...)
+	resp.Diagnostics.Append(validator.ValidateStringField("AuxTagAttrsCreate", "topic", data.Topic, path.Root("topic"))...)
+	resp.Diagnostics.Append(validator.ValidateStringField("AuxTagAttrsCreate", "help", data.Help, path.Root("help"))...)
 }

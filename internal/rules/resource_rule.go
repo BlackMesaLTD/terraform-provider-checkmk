@@ -16,8 +16,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &RuleResource{}
-var _ resource.ResourceWithImportState = &RuleResource{}
+var (
+	_ resource.Resource                   = &RuleResource{}
+	_ resource.ResourceWithImportState    = &RuleResource{}
+	_ resource.ResourceWithValidateConfig = &RuleResource{}
+)
 
 func NewRuleResource() resource.Resource {
 	return &RuleResource{}
@@ -443,4 +446,23 @@ func (r *RuleResource) ImportState(ctx context.Context, req resource.ImportState
 	// Set both api_id and a placeholder ID (will be recalculated on first read)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("api_id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), "imported")...)
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *RuleResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if r.providerData == nil {
+		return
+	}
+
+	var data RuleResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validator := common.NewAttributeValidator(r.providerData)
+
+	// Validate fields against RuleObject schema
+	resp.Diagnostics.Append(validator.ValidateStringField("RuleObject", "ruleset", data.Ruleset, path.Root("ruleset"))...)
+	resp.Diagnostics.Append(validator.ValidateStringField("RuleObject", "folder", data.Folder, path.Root("folder"))...)
 }

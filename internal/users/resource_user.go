@@ -13,8 +13,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &UserResource{}
-var _ resource.ResourceWithImportState = &UserResource{}
+var (
+	_ resource.Resource                   = &UserResource{}
+	_ resource.ResourceWithImportState    = &UserResource{}
+	_ resource.ResourceWithValidateConfig = &UserResource{}
+)
 
 func NewUserResource() resource.Resource {
 	return &UserResource{}
@@ -349,4 +352,23 @@ func updateUserState(data *UserResourceModel, user *client.User) {
 	if !data.DisableLogin.IsNull() {
 		data.DisableLogin = types.BoolValue(user.Extensions.DisableLogin)
 	}
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *UserResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if r.providerData == nil {
+		return
+	}
+
+	var data UserResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validator := common.NewAttributeValidator(r.providerData)
+
+	// Validate fields against UserObject schema
+	resp.Diagnostics.Append(validator.ValidateStringField("UserObject", "fullname", data.Fullname, path.Root("fullname"))...)
+	resp.Diagnostics.Append(validator.ValidateStringField("UserObject", "auth_type", data.AuthType, path.Root("auth_type"))...)
 }

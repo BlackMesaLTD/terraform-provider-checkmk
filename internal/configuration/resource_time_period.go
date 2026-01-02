@@ -16,8 +16,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &TimePeriodResource{}
-var _ resource.ResourceWithImportState = &TimePeriodResource{}
+var (
+	_ resource.Resource                   = &TimePeriodResource{}
+	_ resource.ResourceWithImportState    = &TimePeriodResource{}
+	_ resource.ResourceWithValidateConfig = &TimePeriodResource{}
+)
 
 func NewTimePeriodResource() resource.Resource {
 	return &TimePeriodResource{}
@@ -626,4 +629,22 @@ func (r *TimePeriodResource) ImportState(ctx context.Context, req resource.Impor
 	// Import by time period name - set both id and name
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), req.ID)...)
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *TimePeriodResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if r.providerData == nil {
+		return
+	}
+
+	var data TimePeriodResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validator := common.NewAttributeValidator(r.providerData)
+
+	// Validate fields against TimePeriod schema
+	resp.Diagnostics.Append(validator.ValidateStringField("TimePeriod", "alias", data.Alias, path.Root("alias"))...)
 }

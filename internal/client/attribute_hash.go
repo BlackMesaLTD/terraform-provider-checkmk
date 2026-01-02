@@ -8,7 +8,6 @@ import (
 )
 
 // AttributeHasher generates deterministic hashes for attribute maps.
-// Uses version-specific CompareKeyFields to select relevant fields.
 type AttributeHasher struct {
 	types *VersionedTypes
 }
@@ -22,23 +21,13 @@ func NewAttributeHasher(types *VersionedTypes) *AttributeHasher {
 	return &AttributeHasher{types: types}
 }
 
-// HashHostAttributes generates a hash for host attributes.
-// Uses HostCreateAttributeCompareKeyFields to select relevant fields.
-func (h *AttributeHasher) HashHostAttributes(attributes map[string]interface{}) string {
+// HashAttributesForSchema generates a hash for attributes using the schema's field names.
+// Uses the schema's field names to select relevant fields for hashing.
+func (h *AttributeHasher) HashAttributesForSchema(schema string, attributes map[string]interface{}) string {
 	if h == nil || h.types == nil {
 		return ""
 	}
-	compareKeys := h.types.HostCreateAttributeCompareKeyFields()
-	return hashAttributesWithKeys(attributes, compareKeys)
-}
-
-// HashFolderAttributes generates a hash for folder attributes.
-// Uses FolderCreateAttributeCompareKeyFields to select relevant fields.
-func (h *AttributeHasher) HashFolderAttributes(attributes map[string]interface{}) string {
-	if h == nil || h.types == nil {
-		return ""
-	}
-	compareKeys := h.types.FolderCreateAttributeCompareKeyFields()
+	compareKeys := h.types.GetSchemaFieldNames(schema)
 	return hashAttributesWithKeys(attributes, compareKeys)
 }
 

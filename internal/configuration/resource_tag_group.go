@@ -14,8 +14,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &TagGroupResource{}
-var _ resource.ResourceWithImportState = &TagGroupResource{}
+var (
+	_ resource.Resource                   = &TagGroupResource{}
+	_ resource.ResourceWithImportState    = &TagGroupResource{}
+	_ resource.ResourceWithValidateConfig = &TagGroupResource{}
+)
 
 func NewTagGroupResource() resource.Resource {
 	return &TagGroupResource{}
@@ -354,4 +357,24 @@ func (r *TagGroupResource) Delete(ctx context.Context, req resource.DeleteReques
 
 func (r *TagGroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *TagGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if r.providerData == nil {
+		return
+	}
+
+	var data TagGroupResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validator := common.NewAttributeValidator(r.providerData)
+
+	// Validate fields against HostTag schema (tag group schema)
+	resp.Diagnostics.Append(validator.ValidateStringField("HostTag", "title", data.Title, path.Root("title"))...)
+	resp.Diagnostics.Append(validator.ValidateStringField("HostTag", "topic", data.Topic, path.Root("topic"))...)
+	resp.Diagnostics.Append(validator.ValidateStringField("HostTag", "help", data.Help, path.Root("help"))...)
 }

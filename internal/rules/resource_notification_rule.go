@@ -16,8 +16,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &NotificationRuleResource{}
-var _ resource.ResourceWithImportState = &NotificationRuleResource{}
+var (
+	_ resource.Resource                   = &NotificationRuleResource{}
+	_ resource.ResourceWithImportState    = &NotificationRuleResource{}
+	_ resource.ResourceWithValidateConfig = &NotificationRuleResource{}
+)
 
 func NewNotificationRuleResource() resource.Resource {
 	return &NotificationRuleResource{}
@@ -261,4 +264,10 @@ func (r *NotificationRuleResource) Delete(ctx context.Context, req resource.Dele
 
 func (r *NotificationRuleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ValidateConfig validates the resource configuration using generated types.
+func (r *NotificationRuleResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Notification rule uses raw JSON config - schema validation is handled by the API.
+	// The OpenAPI schema for notification rules is complex and varies by notification method.
 }
