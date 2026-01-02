@@ -265,9 +265,9 @@ func TestGetUpdateSchema(t *testing.T) {
 	}{
 		{"checkmk_host", "HostUpdateAttribute"},
 		{"checkmk_folder", "FolderUpdateAttribute"},
-		{"checkmk_rule", "RuleObject"},                 // Same as create
-		{"checkmk_aux_tag", "AuxTagAttrsUpdate"},       // Different from create
-		{"checkmk_activation", "ActivateChanges"},      // Falls back to create (update is empty)
+		{"checkmk_rule", "RuleObject"},            // Same as create
+		{"checkmk_aux_tag", "AuxTagAttrsUpdate"},  // Different from create
+		{"checkmk_activation", "ActivateChanges"}, // Falls back to create (update is empty)
 		{"nonexistent", ""},
 	}
 
@@ -310,8 +310,8 @@ func TestGetAttributeSchema(t *testing.T) {
 	}{
 		{"checkmk_host", "HostCreateAttribute"},
 		{"checkmk_folder", "FolderCreateAttribute"},
-		{"checkmk_user", ""},    // No attribute schema
-		{"checkmk_rule", ""},    // No attribute schema
+		{"checkmk_user", ""}, // No attribute schema
+		{"checkmk_rule", ""}, // No attribute schema
 		{"nonexistent", ""},
 	}
 

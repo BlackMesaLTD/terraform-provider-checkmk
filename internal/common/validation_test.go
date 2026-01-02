@@ -82,10 +82,10 @@ func TestAttributeValidator_ValidateHostAttributes(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		attributes     map[string]string
-		expectErrors   int
-		errorContains  string
+		name          string
+		attributes    map[string]string
+		expectErrors  int
+		errorContains string
 	}{
 		{
 			name: "valid attributes",
@@ -476,9 +476,9 @@ func TestAttributeValidator_ValidateSchemaExists(t *testing.T) {
 
 func TestAttributeValidator_GetVersionString(t *testing.T) {
 	tests := []struct {
-		name       string
-		pd         *ProviderData
-		expected   string
+		name     string
+		pd       *ProviderData
+		expected string
 	}{
 		{
 			name:     "nil provider data",

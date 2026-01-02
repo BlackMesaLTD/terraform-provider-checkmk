@@ -17,8 +17,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                = &HostResource{}
-	_ resource.ResourceWithImportState = &HostResource{}
+	_ resource.Resource                   = &HostResource{}
+	_ resource.ResourceWithImportState    = &HostResource{}
 	_ resource.ResourceWithValidateConfig = &HostResource{}
 )
 

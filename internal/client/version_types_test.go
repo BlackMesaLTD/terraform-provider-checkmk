@@ -78,9 +78,9 @@ func TestNewVersionedTypes(t *testing.T) {
 
 func TestVersionedTypes_SupportsVersion(t *testing.T) {
 	tests := []struct {
-		name    string
-		vt      *VersionedTypes
-		want    bool
+		name string
+		vt   *VersionedTypes
+		want bool
 	}{
 		{
 			name: "supported version",
