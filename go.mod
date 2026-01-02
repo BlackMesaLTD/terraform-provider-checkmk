@@ -2,8 +2,8 @@ module github.com/terraform-provider-checkmk
 
 go 1.24.1
 
-// For local development, uncomment replace directive:
-replace github.com/BlackMesaLTD/checkmk-api-spec => ../checkmk-api-spec
+// For local development, uncomment the replace directive:
+// replace github.com/BlackMesaLTD/checkmk-api-spec => ../checkmk-api-spec
 
 require (
 	github.com/BlackMesaLTD/checkmk-api-spec v0.0.4
