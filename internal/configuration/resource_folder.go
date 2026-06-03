@@ -114,7 +114,11 @@ func (r *FolderResource) Create(ctx context.Context, req resource.CreateRequest,
 			return
 		}
 		for k, v := range elements {
-			attributes[k] = v.ValueString()
+			apiKey := k
+			if !strings.HasPrefix(k, "tag_") && common.IsTagAttribute(r.providerData, "checkmk_folder", k) {
+				apiKey = "tag_" + k
+			}
+			attributes[apiKey] = v.ValueString()
 		}
 	}
 
@@ -141,20 +145,6 @@ func (r *FolderResource) Create(ctx context.Context, req resource.CreateRequest,
 	data.Path = types.StringValue(folderPath)
 	data.Title = types.StringValue(folder.Title)
 
-	if len(folder.Extensions.Attributes) > 0 {
-		attrMap := make(map[string]string)
-		for k, v := range folder.Extensions.Attributes {
-			if str, ok := v.(string); ok {
-				attrMap[k] = str
-			}
-		}
-		attrValue, diags := types.MapValueFrom(ctx, types.StringType, attrMap)
-		resp.Diagnostics.Append(diags...)
-		data.Attributes = attrValue
-	} else {
-		data.Attributes = types.MapNull(types.StringType)
-	}
-
 	if err := common.TrackAndActivate(ctx, r.providerData, cfg, "folder"); err != nil {
 		common.AddActivationWarning(resp, "Folder", "created", err)
 	}
@@ -180,16 +170,50 @@ func (r *FolderResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	data.Title = types.StringValue(folder.Title)
 
+	// Convert attributes from API response
 	if len(folder.Extensions.Attributes) > 0 {
 		attrMap := make(map[string]string)
-		for k, v := range folder.Extensions.Attributes {
-			if str, ok := v.(string); ok {
-				attrMap[k] = str
+		managedKeys := make(map[string]struct{})
+		if !data.Attributes.IsNull() && !data.Attributes.IsUnknown() {
+			for k := range data.Attributes.Elements() {
+				managedKeys[k] = struct{}{}
 			}
 		}
-		attrValue, diags := types.MapValueFrom(ctx, types.StringType, attrMap)
-		resp.Diagnostics.Append(diags...)
-		data.Attributes = attrValue
+
+		for apiK, apiV := range folder.Extensions.Attributes {
+			strValue, ok := apiV.(string)
+			if !ok {
+				continue
+			}
+
+			targetKey := apiK
+
+			// Normalization logic for Tags:
+			if strings.HasPrefix(apiK, "tag_") {
+				unprefixed := strings.TrimPrefix(apiK, "tag_")
+
+				// We prefer the unprefixed form (canonical for Terraform)
+				// UNLESS the prefixed form is explicitly managed in the state
+				if _, prefixedManaged := managedKeys[apiK]; !prefixedManaged {
+					targetKey = unprefixed
+				}
+			}
+
+			// During import (managedKeys is empty) or if the key is explicitly managed,
+			// or if the normalized key is managed, we include it
+			_, isManaged := managedKeys[targetKey]
+			if len(managedKeys) == 0 || isManaged {
+				attrMap[targetKey] = strValue
+			}
+		}
+
+		if len(attrMap) > 0 {
+			attrValue, diags := types.MapValueFrom(ctx, types.StringType, attrMap)
+			resp.Diagnostics.Append(diags...)
+			data.Attributes = attrValue
+		} else {
+			data.Attributes = types.MapNull(types.StringType)
+		}
 	} else {
 		data.Attributes = types.MapNull(types.StringType)
 	}
@@ -214,7 +238,11 @@ func (r *FolderResource) Update(ctx context.Context, req resource.UpdateRequest,
 			return
 		}
 		for k, v := range elements {
-			attributes[k] = v.ValueString()
+			apiKey := k
+			if !strings.HasPrefix(k, "tag_") && common.IsTagAttribute(r.providerData, "checkmk_folder", k) {
+				apiKey = "tag_" + k
+			}
+			attributes[apiKey] = v.ValueString()
 		}
 	}
 
@@ -235,20 +263,6 @@ func (r *FolderResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	data.Title = types.StringValue(folder.Title)
-
-	if len(folder.Extensions.Attributes) > 0 {
-		attrMap := make(map[string]string)
-		for k, v := range folder.Extensions.Attributes {
-			if str, ok := v.(string); ok {
-				attrMap[k] = str
-			}
-		}
-		attrValue, diags := types.MapValueFrom(ctx, types.StringType, attrMap)
-		resp.Diagnostics.Append(diags...)
-		data.Attributes = attrValue
-	} else {
-		data.Attributes = types.MapNull(types.StringType)
-	}
 
 	if err := common.TrackAndActivate(ctx, r.providerData, cfg, "folder"); err != nil {
 		common.AddActivationWarning(resp, "Folder", "updated", err)
@@ -299,8 +313,12 @@ func (r *FolderResource) ImportState(ctx context.Context, req resource.ImportSta
 	if len(folder.Extensions.Attributes) > 0 {
 		attrMap := make(map[string]string)
 		for k, v := range folder.Extensions.Attributes {
-			if str, ok := v.(string); ok {
-				attrMap[k] = str
+			if strValue, ok := v.(string); ok {
+				targetKey := k
+				if strings.HasPrefix(k, "tag_") {
+					targetKey = strings.TrimPrefix(k, "tag_")
+				}
+				attrMap[targetKey] = strValue
 			}
 		}
 		attrValue, diags := types.MapValueFrom(ctx, types.StringType, attrMap)

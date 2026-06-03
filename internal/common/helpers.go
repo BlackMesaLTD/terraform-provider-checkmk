@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -143,6 +144,35 @@ func BuildSimpleBaseConfig(pd *ProviderData, strictLockingOverride types.Bool) B
 		ActivationWaitTime:    pd.ActivationWaitTime,
 		StrictResourceLocking: GetEffectiveStrictLocking(pd.StrictResourceLocking, strictLockingOverride),
 	}
+}
+
+// IsTagAttribute determines if an attribute should be prefixed with 'tag_'.
+// It checks the OpenAPI schema for the given resource type.
+func IsTagAttribute(pd *ProviderData, resourceType, key string) bool {
+	if strings.HasPrefix(key, "tag_") {
+		return true
+	}
+
+	// 1. Check schema if available (most accurate)
+	if pd != nil && pd.Types != nil {
+		schema := GetAttributeSchema(resourceType)
+		if schema != "" {
+			prefixed := "tag_" + key
+			if pd.Types.ValidateFieldName(schema, prefixed) {
+				return true
+			}
+		}
+	}
+
+	// 2. Fallback to heuristic for common tags
+	tags := []string{"agent", "piggyback", "criticality", "location", "networking", "snmp_ds"}
+	for _, t := range tags {
+		if key == t {
+			return true
+		}
+	}
+
+	return false
 }
 
 // =============================================================================

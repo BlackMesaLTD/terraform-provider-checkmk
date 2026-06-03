@@ -3,6 +3,7 @@ package hosts
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -98,7 +99,12 @@ func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if !data.Attributes.IsNull() {
 		for key, value := range data.Attributes.Elements() {
 			if strValue, ok := value.(types.String); ok {
-				attributes[key] = strValue.ValueString()
+				// Automatic mapping of unprefixed tag attributes to 'tag_' prefix for the API
+				apiKey := key
+				if !strings.HasPrefix(key, "tag_") && common.IsTagAttribute(r.providerData, "checkmk_host", key) {
+					apiKey = "tag_" + key
+				}
+				attributes[apiKey] = strValue.ValueString()
 			}
 		}
 	}
@@ -159,22 +165,38 @@ func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	// Convert attributes from API response
 	if len(host.Extensions.Attributes) > 0 {
 		attrMap := make(map[string]string)
+		managedKeys := make(map[string]struct{})
+		if !data.Attributes.IsNull() {
+			for k := range data.Attributes.Elements() {
+				managedKeys[k] = struct{}{}
+			}
+		}
 
-		if data.Attributes.IsNull() {
-			// During import, we don't have previous state, so include all attributes
-			for key, value := range host.Extensions.Attributes {
-				if strValue, ok := value.(string); ok {
-					attrMap[key] = strValue
+		for apiK, apiV := range host.Extensions.Attributes {
+			strValue, ok := apiV.(string)
+			if !ok {
+				continue
+			}
+
+			targetKey := apiK
+
+			if strings.HasPrefix(apiK, "tag_") {
+				unprefixed := strings.TrimPrefix(apiK, "tag_")
+
+				// We prefer the unprefixed form (canonical for Terraform)
+				// UNLESS the prefixed form is explicitly managed in the state
+				// This allows users to switch from 'tag_agent' to 'agent' in HCL
+				// and have it normalized during the next refresh
+				if _, prefixedManaged := managedKeys[apiK]; !prefixedManaged {
+					targetKey = unprefixed
 				}
 			}
-		} else {
-			// Only include attributes that we're managing to avoid drift from unmanaged attributes
-			for key := range data.Attributes.Elements() {
-				if value, exists := host.Extensions.Attributes[key]; exists {
-					if strValue, ok := value.(string); ok {
-						attrMap[key] = strValue
-					}
-				}
+
+			// During import (managedKeys is empty) or if the key is explicitly managed,
+			// or if the normalized key is managed, we include it
+			_, isManaged := managedKeys[targetKey]
+			if len(managedKeys) == 0 || isManaged {
+				attrMap[targetKey] = strValue
 			}
 		}
 
@@ -200,7 +222,12 @@ func (r *HostResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if !data.Attributes.IsNull() {
 		for key, value := range data.Attributes.Elements() {
 			if strValue, ok := value.(types.String); ok {
-				attributes[key] = strValue.ValueString()
+				// Automatic mapping of unprefixed tag attributes to 'tag_' prefix for the API
+				apiKey := key
+				if !strings.HasPrefix(key, "tag_") && common.IsTagAttribute(r.providerData, "checkmk_host", key) {
+					apiKey = "tag_" + key
+				}
+				attributes[apiKey] = strValue.ValueString()
 			}
 		}
 	}
