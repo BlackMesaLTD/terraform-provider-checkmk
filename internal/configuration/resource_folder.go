@@ -79,7 +79,9 @@ func (r *FolderResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"attributes": schema.MapAttribute{
-				Description: "Folder attributes that will be inherited by hosts.",
+				Description: "Folder attributes that will be inherited by hosts. " +
+					"Custom attributes are accepted without prefix (e.g., `proxy_port`). " +
+					"A fuzzy check prevents common typos of built-in attributes.",
 				ElementType: types.StringType,
 				Optional:    true,
 				Computed:    true,

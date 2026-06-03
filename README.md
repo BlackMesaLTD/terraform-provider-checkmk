@@ -220,7 +220,7 @@ The provider automatically detects the CheckMK version and adjusts API calls acc
 
 ### Validation
 - **Plan-time validation** - Field names and enum values (like `tag_agent`) are validated during `terraform plan` when connected to CheckMK. Invalid values produce errors before apply.
-- **Custom attributes** - User-defined custom attributes and tag values (prefixed with `tag_` or `labels`) are accepted without validation (the API validates these).
+- **Custom attributes** - User-defined custom attributes and tag values are accepted without a mandatory prefix (though `tag_` or `labels` can still be used). A "smart validation" with fuzzy matching (Levenshtein distance) prevents common typos of built-in attributes (e.g., `ailas` instead of `alias`).
 - **Hollow mode** - Set `type_mode = "hollow"` to skip plan-time validation entirely (useful for testing or when version types are unavailable).
 
 ### Rules

@@ -67,6 +67,8 @@ func (r *HostResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 					"  - `ipaddress`: IP address of the host\n" +
 					"  - `site`: CheckMK site ID\n" +
 					"  - `tag_agent`: Agent type (e.g., 'cmk-agent', 'snmp-v2')\n\n" +
+					"Custom attributes are accepted without prefix (e.g., `proxy_port`). " +
+					"A fuzzy check prevents common typos of built-in attributes. " +
 					"All attributes are replaced on update (full replacement strategy).",
 				ElementType: types.StringType,
 				Optional:    true,

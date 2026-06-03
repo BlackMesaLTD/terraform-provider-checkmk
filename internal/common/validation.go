@@ -57,20 +57,37 @@ func (v *AttributeValidator) ValidateAttributes(ctx context.Context, schemaName 
 	// Check each attribute key
 	for key := range attributes.Elements() {
 		if !contains(validFields, key) {
-			// Check if it's a custom attribute (starts with tag_ or custom_)
-			if isCustomAttribute(key) {
-				// Custom attributes are allowed, API will validate
+			// Explicit custom attributes (starts with tag_ or labels) are always allowed
+			if isExplicitCustomAttribute(key) {
 				continue
 			}
 
-			diags.AddAttributeError(
-				attrPath.AtMapKey(key),
-				"Invalid Attribute",
-				fmt.Sprintf("Attribute %q is not valid for %s in CheckMK version %s. "+
-					"Valid attributes include: %s. "+
-					"If this is a custom attribute, prefix it with 'tag_' or ensure it's defined in CheckMK.",
-					key, schemaName, v.providerData.Client.Version.String(), formatValidFields(validFields)),
-			)
+			// Check if its a potential typo of a standard attribute
+			// If it is a close match (Levenshtein distance <= 2), we treat it as an error
+			// to protect the user from typos for example "alais" instead of "alias"
+			potentialTypo := ""
+			for _, field := range validFields {
+				if levenshtein(key, field) <= 2 {
+					potentialTypo = field
+					break
+				}
+			}
+
+			if potentialTypo != "" {
+				diags.AddAttributeError(
+					attrPath.AtMapKey(key),
+					"Invalid Attribute",
+					fmt.Sprintf("Attribute %q is not valid for %s in CheckMK version %s. "+
+						"Did you mean %q? "+
+						"If this is an intentional custom attribute, please ensure it doesn't closely match a built-in attribute name, or prefix it with 'tag_'.",
+						key, schemaName, v.providerData.Client.Version.String(), potentialTypo),
+				)
+				continue
+			}
+
+			// If it's not a close match to any valid field, we allow it as an implicit custom attribute.
+			// The CheckMK API will perform the final validation at runtime.
+			continue
 		}
 
 		// Warn about read-only fields
@@ -189,9 +206,8 @@ func (v *AttributeValidator) validateEnumField(ctx context.Context, schemaName, 
 	return diags
 }
 
-// isCustomAttribute returns true if the attribute name indicates a custom attribute.
-// Custom attributes include user-defined tags and custom host attributes.
-func isCustomAttribute(name string) bool {
+// isExplicitCustomAttribute returns true if the attribute name has an explicit custom prefix.
+func isExplicitCustomAttribute(name string) bool {
 	// Standard tag prefixes
 	if strings.HasPrefix(name, "tag_") {
 		// Built-in tags are validated, custom tags start with tag_ but aren't in the schema
@@ -202,6 +218,46 @@ func isCustomAttribute(name string) bool {
 		return true
 	}
 	return false
+}
+
+// levenshtein calculates the Levenshtein distance between two strings
+func levenshtein(s, t string) int {
+	if len(s) == 0 {
+		return len(t)
+	}
+	if len(t) == 0 {
+		return len(s)
+	}
+
+	d := make([][]int, len(s)+1)
+	for i := range d {
+		d[i] = make([]int, len(t)+1)
+	}
+
+	for i := 0; i <= len(s); i++ {
+		d[i][0] = i
+	}
+	for j := 0; j <= len(t); j++ {
+		d[0][j] = j
+	}
+
+	for j := 1; j <= len(t); j++ {
+		for i := 1; i <= len(s); i++ {
+			if s[i-1] == t[j-1] {
+				d[i][j] = d[i-1][j-1]
+			} else {
+				min := d[i-1][j] + 1
+				if d[i][j-1]+1 < min {
+					min = d[i][j-1] + 1
+				}
+				if d[i-1][j-1]+1 < min {
+					min = d[i-1][j-1] + 1
+				}
+				d[i][j] = min
+			}
+		}
+	}
+	return d[len(s)][len(t)]
 }
 
 // formatValidFields formats a list of valid fields for display in error messages.

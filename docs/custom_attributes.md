@@ -85,15 +85,16 @@ omd restart
 
 ## Using Custom Attributes with Terraform
 
-Once custom attributes are configured in CheckMK, the Terraform provider can use them immediately:
+Once custom attributes are configured in CheckMK, the Terraform provider can use them immediately. 
+
+### Smart Validation
+
+The provider supports **smart validation** for custom attributes:
+- ✅ You can use attributes **without any prefix** (e.g., `proxy_port = "8080"`).
+- ✅ You can still use the **`tag_` prefix** to explicitly mark an attribute as custom and skip fuzzy matching.
+- ❌ The provider will **catch typos** of built-in attributes. For example, if you type `ailas = "..."`, the provider will detect it's close to the built-in `alias` and show an error: *"Did you mean 'alias'?"*. This check uses a Levenshtein distance of 2.
 
 ```hcl
-provider "checkmk" {
-  url      = "http://localhost:5000/cmk"
-  username = "automation"
-  password = "secret"
-}
-
 resource "checkmk_host" "network_device" {
   host_name = "router-01"
   folder    = "/network"
@@ -102,14 +103,12 @@ resource "checkmk_host" "network_device" {
     # Built-in attributes
     alias     = "Core Router 01"
     ipaddress = "10.0.1.1"
-    site      = "site1"
 
-    # Custom attributes (must be pre-configured via CLI)
+    # Custom attributes (accepted without prefix)
     proxy_port         = "8080"
     device_description = "Main office core router"
     device_make        = "Cisco"
     snowgroup          = "network-team"
-    tcp_port           = "22"
   }
 }
 ```
@@ -118,9 +117,9 @@ resource "checkmk_host" "network_device" {
 
 ### Provider Behavior
 
-- ✅ The provider accepts **any** attribute name
-- ✅ CheckMK API validates whether the attribute exists
-- ❌ If you use a non-existent custom attribute, CheckMK will return an error
+- ✅ The provider accepts any attribute name that doesn't closely match a built-in attribute.
+- ✅ CheckMK API validates whether the attribute exists during `apply`.
+- ❌ If you use a non-existent custom attribute that doesn't exist in CheckMK, the API will return an error during execution.
 
 ### Example Error
 

@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -254,7 +255,7 @@ func TestAttributeValidator_HollowModeSkipsValidation(t *testing.T) {
 	}
 }
 
-func TestIsCustomAttribute(t *testing.T) {
+func TestIsExplicitCustomAttribute(t *testing.T) {
 	tests := []struct {
 		name     string
 		attr     string
@@ -270,9 +271,111 @@ func TestIsCustomAttribute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isCustomAttribute(tt.attr)
+			result := isExplicitCustomAttribute(tt.attr)
 			if result != tt.expected {
-				t.Errorf("isCustomAttribute(%q) = %v, want %v", tt.attr, result, tt.expected)
+				t.Errorf("isExplicitCustomAttribute(%q) = %v, want %v", tt.attr, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLevenshtein(t *testing.T) {
+	tests := []struct {
+		s, t     string
+		expected int
+	}{
+		{"", "", 0},
+		{"a", "", 1},
+		{"", "a", 1},
+		{"abc", "abc", 0},
+		{"abc", "abd", 1},
+		{"alias", "ailas", 2},
+		{"ipaddress", "ipaderess", 2},
+		{"ipaddress", "ipaddr", 3},
+		{"alias", "proxy_port", 10},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s-%s", tt.s, tt.t), func(t *testing.T) {
+			result := levenshtein(tt.s, tt.t)
+			if result != tt.expected {
+				t.Errorf("levenshtein(%q, %q) = %d, want %d", tt.s, tt.t, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAttributeValidator_SmartValidation(t *testing.T) {
+	versionedTypes := client.NewVersionedTypes("2.4.0p17")
+	providerData := &ProviderData{
+		TypeMode: TypeModeAuto,
+		Types:    versionedTypes,
+		Client:   &client.Client{Version: &client.Version{Major: 2, Minor: 4, Patch: 0, Build: 17}},
+	}
+
+	v := NewAttributeValidator(providerData)
+
+	tests := []struct {
+		name          string
+		attributes    map[string]string
+		expectErrors  int
+		errorContains string
+	}{
+		{
+			name: "implicit custom attribute allowed",
+			attributes: map[string]string{
+				"proxy_port": "8080",
+			},
+			expectErrors: 0,
+		},
+		{
+			name: "another custom attribute allowed",
+			attributes: map[string]string{
+				"device_description": "some description",
+			},
+			expectErrors: 0,
+		},
+		{
+			name: "typo of alias (distance 1) rejected",
+			attributes: map[string]string{
+				"ailas": "typo",
+			},
+			expectErrors:  1,
+			errorContains: "Did you mean \"alias\"?",
+		},
+		{
+			name: "typo of ipaddress (distance 2) rejected",
+			attributes: map[string]string{
+				"ipaderess": "typo",
+			},
+			expectErrors:  1,
+			errorContains: "Did you mean \"ipaddress\"?",
+		},
+		{
+			name: "far match (distance > 2) allowed as custom",
+			attributes: map[string]string{
+				"ipaddr": "1.2.3.4",
+			},
+			expectErrors: 0, // distance from 'ipaddress' is 3
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attrMap := make(map[string]types.String)
+			for k, val := range tt.attributes {
+				attrMap[k] = types.StringValue(val)
+			}
+			attrs, _ := types.MapValueFrom(context.Background(), types.StringType, attrMap)
+
+			diags := v.ValidateHostAttributes(context.Background(), attrs, path.Root("attributes"))
+
+			if diags.ErrorsCount() != tt.expectErrors {
+				t.Errorf("Expected %d errors, got %d: %v", tt.expectErrors, diags.ErrorsCount(), diags)
+			}
+
+			if tt.errorContains != "" && !strings.Contains(fmt.Sprintf("%v", diags), tt.errorContains) {
+				t.Errorf("Expected error to contain %q, but got: %v", tt.errorContains, diags)
 			}
 		})
 	}
