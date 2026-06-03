@@ -119,7 +119,7 @@ mkdir -p testing/lifecycle/<resource_name>
 terraform {
   required_providers {
     checkmk = {
-      source = "blackmesaltd/checkmk"
+      source = "N3moAhead/checkmk"
     }
   }
 }

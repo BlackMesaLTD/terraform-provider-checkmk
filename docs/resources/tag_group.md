@@ -15,7 +15,7 @@ Manages a CheckMK host tag group configuration. Tag groups do not require activa
 terraform {
   required_providers {
     checkmk = {
-      source = "blackmesaltd/checkmk"
+      source = "N3moAhead/checkmk"
     }
   }
 }

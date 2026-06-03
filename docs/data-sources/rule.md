@@ -16,7 +16,7 @@ Use this data source to retrieve information about a CheckMK rule by its ID.
 terraform {
   required_providers {
     checkmk = {
-      source = "blackmesaltd/checkmk"
+      source = "N3moAhead/checkmk"
     }
   }
 }

@@ -15,7 +15,7 @@ Manages a CheckMK host configuration.
 terraform {
   required_providers {
     checkmk = {
-      source = "blackmesaltd/checkmk"
+      source = "N3moAhead/checkmk"
     }
   }
 }

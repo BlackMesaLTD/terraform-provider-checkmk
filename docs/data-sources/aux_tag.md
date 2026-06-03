@@ -16,7 +16,7 @@ Use this data source to retrieve information about a CheckMK auxiliary tag.
 terraform {
   required_providers {
     checkmk = {
-      source = "blackmesaltd/checkmk"
+      source = "N3moAhead/checkmk"
     }
   }
 }
