@@ -118,9 +118,34 @@ resource "checkmk_host" "network_device" {
 
 ### Provider Behavior
 
-- ✅ The provider accepts **any** attribute name
-- ✅ CheckMK API validates whether the attribute exists
+- ✅ The provider accepts **any** attribute name, with or without a prefix
+- ✅ Custom attributes are passed straight through to the CheckMK API
+- ✅ CheckMK API validates whether the attribute exists (at `apply` time)
 - ❌ If you use a non-existent custom attribute, CheckMK will return an error
+- ℹ️ Keys that aren't built-in fields are passed through to the API unchanged; the API is the source of truth for whether a custom attribute exists.
+
+### Built-in Tag Groups
+
+Built-in host tag groups are exposed by the API with a `tag_` prefix
+(`tag_agent`, `tag_criticality`, …). For convenience you may write them
+**without** the prefix:
+
+```hcl
+attributes = {
+  agent       = "cmk-agent" # promoted to tag_agent for the API
+  criticality = "prod"      # promoted to tag_criticality
+  tag_agent   = "cmk-agent" # the explicit form also works
+}
+```
+
+The provider promotes the unprefixed form to the API automatically and keeps
+your configured key in state, so there is no perpetual diff. Promotion is
+driven entirely by the generated schema: only a key whose `tag_` form is a
+known field is promoted, so custom attributes are passed through unchanged.
+
+> **Custom tag groups** (tag groups you defined yourself) are not part of the
+> generated schema, so write them with the explicit `tag_` prefix
+> (e.g. `tag_my_group`).
 
 ### Example Error
 

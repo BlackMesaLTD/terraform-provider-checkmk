@@ -219,8 +219,9 @@ The provider automatically detects the CheckMK version and adjusts API calls acc
 - **No data sources** - Currently only resources are implemented; data sources for reading existing configuration are planned.
 
 ### Validation
-- **Plan-time validation** - Field names and enum values (like `tag_agent`) are validated during `terraform plan` when connected to CheckMK. Invalid values produce errors before apply.
-- **Custom attributes** - User-defined custom attributes and tag values (prefixed with `tag_` or `labels`) are accepted without validation (the API validates these).
+- **Plan-time validation** - Enum values of known fields (like `tag_agent`) are validated during `terraform plan` when connected to CheckMK. Invalid values produce errors before apply.
+- **Custom attributes** - The `attributes` map is open: user-defined custom attributes are accepted without a prefix and passed straight through to the API, which is the source of truth for whether they exist. Keys that aren't built-in fields are validated by the API at apply time.
+- **Built-in tag groups** - Built-in host tag groups may be written with or without the `tag_` prefix (e.g. `agent` or `tag_agent`); the provider promotes the unprefixed form to the API automatically and keeps your configured key in state. Custom tag groups should be written with the explicit `tag_` prefix.
 - **Hollow mode** - Set `type_mode = "hollow"` to skip plan-time validation entirely (useful for testing or when version types are unavailable).
 
 ### Rules

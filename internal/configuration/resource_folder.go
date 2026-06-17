@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -111,8 +112,9 @@ func (r *FolderResource) Create(ctx context.Context, req resource.CreateRequest,
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		promoter := common.NewAttributePromoter(r.providerData, "checkmk_folder")
 		for k, v := range elements {
-			attributes[k] = v.ValueString()
+			attributes[promoter.APIKey(k)] = v.ValueString()
 		}
 	}
 
@@ -139,18 +141,12 @@ func (r *FolderResource) Create(ctx context.Context, req resource.CreateRequest,
 	data.Path = types.StringValue(folderPath)
 	data.Title = types.StringValue(folder.Title)
 
-	if len(folder.Extensions.Attributes) > 0 {
-		attrMap := make(map[string]string)
-		for k, v := range folder.Extensions.Attributes {
-			if str, ok := v.(string); ok {
-				attrMap[k] = str
-			}
-		}
-		attrValue, diags := types.MapValueFrom(ctx, types.StringType, attrMap)
-		resp.Diagnostics.Append(diags...)
-		data.Attributes = attrValue
-	} else {
-		data.Attributes = types.MapNull(types.StringType)
+	// Keep the configured attribute keys in state (full replacement). The API
+	// stores promoted tag groups under their "tag_" form, but state mirrors what
+	// the user wrote so there's no perpetual diff. Only fall back to the API
+	// response when the attribute map was left unset (Computed/unknown).
+	if data.Attributes.IsNull() || data.Attributes.IsUnknown() {
+		data.Attributes = attributesFromAPI(ctx, folder.Extensions.Attributes, &resp.Diagnostics)
 	}
 
 	if err := common.TrackAndActivate(ctx, r.providerData, cfg, "folder"); err != nil {
@@ -178,18 +174,26 @@ func (r *FolderResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	data.Title = types.StringValue(folder.Title)
 
-	if len(folder.Extensions.Attributes) > 0 {
+	// Reconcile attributes from the API response. When attributes are managed
+	// (configured or previously stored), look each key up under its API form
+	// (promoting unprefixed tag groups) and store it back under the configured
+	// key; unmanaged attributes are ignored to avoid drift. When nothing is
+	// managed (e.g. a fresh import), mirror the API response verbatim.
+	if data.Attributes.IsNull() || data.Attributes.IsUnknown() {
+		data.Attributes = attributesFromAPI(ctx, folder.Extensions.Attributes, &resp.Diagnostics)
+	} else {
+		promoter := common.NewAttributePromoter(r.providerData, "checkmk_folder")
 		attrMap := make(map[string]string)
-		for k, v := range folder.Extensions.Attributes {
-			if str, ok := v.(string); ok {
-				attrMap[k] = str
+		for key := range data.Attributes.Elements() {
+			if v, ok := folder.Extensions.Attributes[promoter.APIKey(key)]; ok {
+				if str, ok := v.(string); ok {
+					attrMap[key] = str
+				}
 			}
 		}
 		attrValue, diags := types.MapValueFrom(ctx, types.StringType, attrMap)
 		resp.Diagnostics.Append(diags...)
 		data.Attributes = attrValue
-	} else {
-		data.Attributes = types.MapNull(types.StringType)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -211,8 +215,9 @@ func (r *FolderResource) Update(ctx context.Context, req resource.UpdateRequest,
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		promoter := common.NewAttributePromoter(r.providerData, "checkmk_folder")
 		for k, v := range elements {
-			attributes[k] = v.ValueString()
+			attributes[promoter.APIKey(k)] = v.ValueString()
 		}
 	}
 
@@ -234,18 +239,10 @@ func (r *FolderResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	data.Title = types.StringValue(folder.Title)
 
-	if len(folder.Extensions.Attributes) > 0 {
-		attrMap := make(map[string]string)
-		for k, v := range folder.Extensions.Attributes {
-			if str, ok := v.(string); ok {
-				attrMap[k] = str
-			}
-		}
-		attrValue, diags := types.MapValueFrom(ctx, types.StringType, attrMap)
-		resp.Diagnostics.Append(diags...)
-		data.Attributes = attrValue
-	} else {
-		data.Attributes = types.MapNull(types.StringType)
+	// Keep the configured attribute keys in state (full replacement); only fall
+	// back to the API response when the attribute map was left unset.
+	if data.Attributes.IsNull() || data.Attributes.IsUnknown() {
+		data.Attributes = attributesFromAPI(ctx, folder.Extensions.Attributes, &resp.Diagnostics)
 	}
 
 	if err := common.TrackAndActivate(ctx, r.providerData, cfg, "folder"); err != nil {
@@ -305,6 +302,24 @@ func (r *FolderResource) ImportState(ctx context.Context, req resource.ImportSta
 		resp.Diagnostics.Append(diags...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("attributes"), attrValue)...)
 	}
+}
+
+// attributesFromAPI converts a CheckMK API attribute map into a Terraform map,
+// preserving the API keys verbatim. It returns a null map when there are no
+// string attributes to store.
+func attributesFromAPI(ctx context.Context, apiAttrs map[string]interface{}, diags *diag.Diagnostics) types.Map {
+	attrMap := make(map[string]string)
+	for k, v := range apiAttrs {
+		if str, ok := v.(string); ok {
+			attrMap[k] = str
+		}
+	}
+	if len(attrMap) == 0 {
+		return types.MapNull(types.StringType)
+	}
+	attrValue, d := types.MapValueFrom(ctx, types.StringType, attrMap)
+	diags.Append(d...)
+	return attrValue
 }
 
 func computeFolderPath(parent, name string) string {

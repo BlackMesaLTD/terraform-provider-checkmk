@@ -118,6 +118,30 @@ func TestAttributeValidator_ValidateHostAttributes(t *testing.T) {
 			expectErrors: 0, // Custom tags are allowed
 		},
 		{
+			name: "unprefixed custom attribute allowed",
+			attributes: map[string]string{
+				"proxy_port":         "8080",
+				"device_description": "core router",
+			},
+			expectErrors: 0, // Unknown keys pass through to the API
+		},
+		{
+			name: "unprefixed built-in tag group allowed",
+			attributes: map[string]string{
+				"agent": "cmk-agent",
+			},
+			expectErrors: 0, // Promoted to tag_agent at apply time
+		},
+		{
+			name: "custom attribute that is not a built-in field is accepted",
+			attributes: map[string]string{
+				// Any key that isn't a built-in field is passed through; the
+				// API validates whether the custom attribute exists.
+				"ipaddres": "some-value",
+			},
+			expectErrors: 0,
+		},
+		{
 			name:         "null attributes",
 			attributes:   nil,
 			expectErrors: 0,
@@ -251,58 +275,6 @@ func TestAttributeValidator_HollowModeSkipsValidation(t *testing.T) {
 	diags := v.ValidateHostAttributes(context.Background(), attrs, path.Root("attributes"))
 	if diags.HasError() {
 		t.Errorf("Hollow mode should skip validation, but got errors: %v", diags)
-	}
-}
-
-func TestIsCustomAttribute(t *testing.T) {
-	tests := []struct {
-		name     string
-		attr     string
-		expected bool
-	}{
-		{"standard tag", "tag_agent", true},
-		{"custom tag", "tag_my_custom", true},
-		{"labels", "labels", true},
-		{"alias is not custom", "alias", false},
-		{"ipaddress is not custom", "ipaddress", false},
-		{"site is not custom", "site", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isCustomAttribute(tt.attr)
-			if result != tt.expected {
-				t.Errorf("isCustomAttribute(%q) = %v, want %v", tt.attr, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestFormatValidFields(t *testing.T) {
-	tests := []struct {
-		name     string
-		fields   []string
-		contains string
-	}{
-		{
-			name:     "few fields",
-			fields:   []string{"alias", "ipaddress", "site"},
-			contains: "alias",
-		},
-		{
-			name:     "many fields truncated",
-			fields:   []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"},
-			contains: "and 2 more",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := formatValidFields(tt.fields)
-			if !strings.Contains(result, tt.contains) {
-				t.Errorf("formatValidFields() = %q, should contain %q", result, tt.contains)
-			}
-		})
 	}
 }
 

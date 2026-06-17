@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -143,6 +144,79 @@ func BuildSimpleBaseConfig(pd *ProviderData, strictLockingOverride types.Bool) B
 		ActivationWaitTime:    pd.ActivationWaitTime,
 		StrictResourceLocking: GetEffectiveStrictLocking(pd.StrictResourceLocking, strictLockingOverride),
 	}
+}
+
+// =============================================================================
+// Attribute Key Promotion (Terraform <-> CheckMK API)
+// =============================================================================
+// Built-in host tag groups are exposed in the OpenAPI schema with a "tag_"
+// prefix (e.g. "tag_agent", "tag_criticality"). For convenience users may
+// write these unprefixed (e.g. "agent"); the provider promotes them to the
+// API form on the way out and maps them back on read. Custom attributes,
+// labels, and keys that already carry the "tag_" prefix are passed through
+// unchanged. Promotion is driven entirely by the generated schema, so only
+// keys whose "tag_" form is a known field are ever promoted.
+
+// AttributePromoter maps Terraform attribute keys to their CheckMK API form.
+// It precomputes the set of valid field names for a resource's attribute
+// schema once, so promotion is an O(1) lookup per key rather than re-scanning
+// the schema for every attribute.
+type AttributePromoter struct {
+	// fields is the set of valid field names for the attribute schema, or nil
+	// when type information is unavailable (hollow mode, unknown version, or a
+	// resource without an attribute schema). A nil set disables promotion and
+	// every key is passed through unchanged.
+	fields map[string]struct{}
+}
+
+// NewAttributePromoter builds a promoter for the given resource type using the
+// generated types in provider data. It is safe to call with nil provider data
+// or missing type information; the resulting promoter passes all keys through.
+func NewAttributePromoter(pd *ProviderData, resourceType string) *AttributePromoter {
+	p := &AttributePromoter{}
+	if pd == nil || pd.Types == nil {
+		return p
+	}
+	schema := GetAttributeSchema(resourceType)
+	if schema == "" {
+		return p
+	}
+	names := pd.Types.GetSchemaFieldNames(schema)
+	if len(names) == 0 {
+		return p
+	}
+	set := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		set[n] = struct{}{}
+	}
+	p.fields = set
+	return p
+}
+
+// APIKey returns the key under which a Terraform attribute key is stored in the
+// CheckMK API. An unprefixed built-in tag group (e.g. "agent") is promoted to
+// its "tag_" form ("tag_agent"); all other keys are returned unchanged.
+func (p *AttributePromoter) APIKey(key string) string {
+	if p.shouldPromote(key) {
+		return "tag_" + key
+	}
+	return key
+}
+
+// shouldPromote reports whether an unprefixed key names a built-in tag group
+// and should therefore be sent to the API as "tag_<key>". It only promotes
+// when the bare key is NOT itself a valid field but "tag_<key>" IS, which is
+// exactly the shape of a built-in host tag group. Custom attributes, whose
+// "tag_" form is not in the schema, are passed through unchanged.
+func (p *AttributePromoter) shouldPromote(key string) bool {
+	if p.fields == nil || strings.HasPrefix(key, "tag_") {
+		return false
+	}
+	if _, isField := p.fields[key]; isField {
+		return false
+	}
+	_, isTagField := p.fields["tag_"+key]
+	return isTagField
 }
 
 // =============================================================================

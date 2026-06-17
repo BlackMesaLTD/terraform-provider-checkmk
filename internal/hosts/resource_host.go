@@ -91,12 +91,14 @@ func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	cfg := common.BuildBaseConfig(r.providerData, data.Activate, data.ForceForeignChanges, data.StrictResourceLocking)
 
-	// Convert attributes map to map[string]interface{}
+	// Convert attributes map to map[string]interface{}, promoting unprefixed
+	// built-in tag groups (e.g. "agent" -> "tag_agent") to their API form.
 	attributes := make(map[string]interface{})
 	if !data.Attributes.IsNull() {
+		promoter := common.NewAttributePromoter(r.providerData, "checkmk_host")
 		for key, value := range data.Attributes.Elements() {
 			if strValue, ok := value.(types.String); ok {
-				attributes[key] = strValue.ValueString()
+				attributes[promoter.APIKey(key)] = strValue.ValueString()
 			}
 		}
 	}
@@ -159,16 +161,21 @@ func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		attrMap := make(map[string]string)
 
 		if data.Attributes.IsNull() {
-			// During import, we don't have previous state, so include all attributes
+			// During import, we don't have previous state, so include all
+			// attributes using the keys exactly as the API returns them.
 			for key, value := range host.Extensions.Attributes {
 				if strValue, ok := value.(string); ok {
 					attrMap[key] = strValue
 				}
 			}
 		} else {
-			// Only include attributes that we're managing to avoid drift from unmanaged attributes
+			// Only include attributes that we're managing to avoid drift from
+			// unmanaged attributes. Look each managed key up under its API form
+			// (promoting unprefixed tag groups) but store it back under the key
+			// the user configured, so "agent" stays "agent" in state.
+			promoter := common.NewAttributePromoter(r.providerData, "checkmk_host")
 			for key := range data.Attributes.Elements() {
-				if value, exists := host.Extensions.Attributes[key]; exists {
+				if value, exists := host.Extensions.Attributes[promoter.APIKey(key)]; exists {
 					if strValue, ok := value.(string); ok {
 						attrMap[key] = strValue
 					}
@@ -193,12 +200,14 @@ func (r *HostResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	cfg := common.BuildBaseConfig(r.providerData, data.Activate, data.ForceForeignChanges, data.StrictResourceLocking)
 
-	// Convert attributes map to map[string]interface{}
+	// Convert attributes map to map[string]interface{}, promoting unprefixed
+	// built-in tag groups (e.g. "agent" -> "tag_agent") to their API form.
 	attributes := make(map[string]interface{})
 	if !data.Attributes.IsNull() {
+		promoter := common.NewAttributePromoter(r.providerData, "checkmk_host")
 		for key, value := range data.Attributes.Elements() {
 			if strValue, ok := value.(types.String); ok {
-				attributes[key] = strValue.ValueString()
+				attributes[promoter.APIKey(key)] = strValue.ValueString()
 			}
 		}
 	}
