@@ -32,8 +32,8 @@ testing/lifecycle/
 
 ```bash
 # Get credentials from container environment (example for 2.4)
-# Container names: checkmk-2.2.0p43, checkmk-2.3.0p41, checkmk-2.4.0p17
-CONTAINER="checkmk-2.4.0p17"
+# Container names: checkmk-2.2.0p47, checkmk-2.3.0p48, checkmk-2.4.0p32
+CONTAINER="checkmk-2.4.0p32"
 
 export CHECKMK_URL="http://localhost:5040/test"
 export CHECKMK_USERNAME="automation"

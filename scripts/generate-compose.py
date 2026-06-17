@@ -31,10 +31,13 @@ import sys
 from pathlib import Path
 
 # Supported CheckMK versions (port offsets from base)
+# The enterprise trial registry (registry.checkmk.com) retains only a rolling
+# window of the most recent ~10 patch releases per branch, so these pins must be
+# refreshed periodically as older patches age out of the window.
 VERSIONS = {
-    "2.2": {"full": "2.2.0p43", "port_offset": 20},
-    "2.3": {"full": "2.3.0p41", "port_offset": 30},
-    "2.4": {"full": "2.4.0p17", "port_offset": 40},
+    "2.2": {"full": "2.2.0p47", "port_offset": 20},
+    "2.3": {"full": "2.3.0p48", "port_offset": 30},
+    "2.4": {"full": "2.4.0p32", "port_offset": 40},
 }
 
 # Docker registry URLs by edition
