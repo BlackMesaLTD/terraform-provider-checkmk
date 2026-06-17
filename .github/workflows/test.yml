@@ -125,6 +125,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
       - name: Login to CheckMK Registry
         uses: docker/login-action@v3
         with:
@@ -138,7 +143,12 @@ jobs:
           docker compose up -d --wait --wait-timeout 180
 
       - name: Run acceptance tests
-        run: ./scripts/run_tests.sh --version ${{ matrix.version }} --verbose
+        run: |
+          # Use the Terraform CLI installed above instead of letting
+          # terraform-plugin-testing download one via hc-install (whose bundled
+          # signing key has expired, breaking checksum verification).
+          export TF_ACC_TERRAFORM_PATH="$(which terraform)"
+          ./scripts/run_tests.sh --version ${{ matrix.version }} --verbose
 
       - name: Show logs on failure
         if: failure()
