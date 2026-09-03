@@ -273,7 +273,13 @@ func (r *RuleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	data.APIID = types.StringValue(rule.ID)
 	data.Ruleset = types.StringValue(rule.Extensions.Ruleset)
 	data.Folder = types.StringValue(rule.Extensions.Folder)
-	data.ValueRaw = types.StringValue(rule.Extensions.ValueRaw)
+	// Checkmk re-serializes Python literals (str(dict)) and inserts whitespace
+	// that differs from the config. Only adopt the API value when it is
+	// semantically different, otherwise keep the state value to avoid a
+	// perpetual diff. Mirrors the notification-rule handling of rule_config.
+	if !valueRawSemanticEquals(data.ValueRaw.ValueString(), rule.Extensions.ValueRaw) {
+		data.ValueRaw = types.StringValue(rule.Extensions.ValueRaw)
+	}
 
 	// Update properties
 	properties.Description = types.StringValue(rule.Extensions.Properties.Description)
@@ -379,7 +385,12 @@ func (r *RuleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		data.APIID = types.StringValue(rule.ID)
 		data.Ruleset = types.StringValue(rule.Extensions.Ruleset)
 		data.Folder = types.StringValue(rule.Extensions.Folder)
-		data.ValueRaw = types.StringValue(rule.Extensions.ValueRaw)
+		// Do NOT overwrite ValueRaw from the API response. value_raw is a
+		// Required (config-provided) attribute; Checkmk returns a re-serialized
+		// Python literal that differs only by whitespace. Adopting it here makes
+		// the post-apply value differ from the planned value and triggers
+		// "Provider produced inconsistent result after apply". Keep the planned
+		// (config) value instead, consistent with Create.
 
 		// Update properties
 		properties.Description = types.StringValue(rule.Extensions.Properties.Description)
